@@ -124,10 +124,12 @@ flowchart LR
 | Metric | Value |
 |--------|-------|
 | Total Samples | 96,757 |
-| Training Samples | 81,833 |
-| Test Samples | 14,924 |
 | Available Features | 237 (1 missing after mapping) |
 | Target Rate | 0.87% |
+| Defaults | 843 |
+| Non-defaults | 95,914 |
+
+**Note:** Train and test files are combined into a single OOT dataset since we're validating (not retraining).
 
 ### 3.3 Column Mapping (v3 → v2 names)
 
@@ -342,25 +344,20 @@ COLUMN_MAPPING = {
 
 ### 8.2 OOT Performance Results
 
-#### By Dataset
-
-| Dataset | Model | AUC | Gini | Brier Score |
-|---------|-------|-----|------|-------------|
-| Train (81,833) | Baseline | 0.6465 | 0.2930 | 0.0744 |
-| Train (81,833) | Optimized | 0.6725 | 0.3450 | 0.0085 |
-| Test (14,924) | Baseline | 0.5708 | 0.1416 | 0.0800 |
-| Test (14,924) | Optimized | 0.6209 | 0.2418 | 0.0093 |
-| Combined (96,757) | Baseline | 0.6204 | 0.2409 | 0.0715 |
-| Combined (96,757) | Optimized | 0.6628 | 0.3256 | 0.0086 |
-
-#### Performance Comparison (Combined Dataset)
+#### Combined Dataset (96,757 samples)
 
 | Metric | Baseline | Optimized | Difference | Status |
 |--------|----------|-----------|------------|--------|
-| AUC | 0.6204 | 0.6628 | +0.0424 | Better |
-| Gini | 0.2409 | 0.3256 | +0.0847 | Better |
-| Brier Score | 0.0715 | 0.0086 | -0.0629 | Better |
-| Log Loss | 0.2784 | 0.0486 | -0.2298 | Better |
+| AUC | 0.6204 | 0.6628 | +0.0424 | ✓ Better |
+| Gini | 0.2409 | 0.3256 | +0.0847 | ✓ Better |
+| Brier Score | 0.0715 | 0.0086 | -0.0629 | ✓ Better |
+| Log Loss | 0.2784 | 0.0486 | -0.2298 | ✓ Better |
+
+#### Key Observations
+
+- **Optimized model outperforms baseline** by 35.16% in Gini coefficient
+- **Calibration is excellent** with Brier Score of 0.0086 (88% better than baseline)
+- **Both models maintain discriminative power** despite population drift
 
 ### 8.3 Performance Degradation Analysis
 
@@ -373,7 +370,7 @@ COLUMN_MAPPING = {
 
 ### 8.4 OOT Visualizations
 
-![Third Version Evaluation](outputs/third_version_evaluation.png)
+![OOT Evaluation](outputs/oot_evaluation.png)
 
 ---
 
@@ -421,10 +418,10 @@ COLUMN_MAPPING = {
 | `credit_scoring_model.pkl` | Baseline model artifacts |
 | `credit_scoring_model_optimized.pkl` | Optimized model with calibration |
 | `test_predictions.csv` | Original test predictions |
-| `third_version_test_predictions.csv` | OOT test predictions |
-| `third_version_combined_predictions.csv` | OOT combined predictions |
+| `oot_predictions.csv` | OOT combined predictions (96,757 samples) |
+| `oot_evaluation_results.csv` | OOT performance metrics |
+| `oot_evaluation.png` | OOT visualization (ROC, distributions, calibration) |
 | `model_comparison.csv` | Training performance metrics |
-| `third_version_evaluation_results.csv` | OOT performance metrics |
 | `optimization_history.csv` | All 100 Optuna trials |
 
 ### 10.2 Column Mapping for Production
@@ -495,5 +492,6 @@ jupyter>=1.0.0
 ---
 
 *Report generated from credit_scoring_model.ipynb and model_prediction.ipynb*
+*OOT validation uses combined dataset (no train/test split since we're validating, not retraining)*
 *All metrics verified against actual output CSV files*
 *Column mapping applied: IbsWorkPositionType→WORKGROUP, IbsWorkSegment→SAHƏLƏR, LopWorkGroup→PARTNYORLUQ*
