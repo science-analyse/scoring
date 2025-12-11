@@ -41,8 +41,8 @@ A production-ready credit risk assessment system using:
 | **Training** | Validation Gini | 0.4968 | 0.5118 | +3.02% |
 | **Training** | Test Gini | 0.4204 | 0.4117 | -2.07% |
 | **Training** | Test Brier | 0.0929 | 0.0114 | -87.75% |
-| **OOT Validation** | Combined Gini | 0.1731 | 0.2670 | +54.27% |
-| **OOT Validation** | Combined Brier | 0.0955 | 0.0086 | -91.00% |
+| **OOT Validation** | Combined Gini | 0.2409 | 0.3256 | +35.16% |
+| **OOT Validation** | Combined Brier | 0.0715 | 0.0086 | -87.97% |
 
 ### 1.3 Key Findings
 
@@ -50,9 +50,11 @@ A production-ready credit risk assessment system using:
 
 2. **Best Configuration:** Elastic Net with strong regularization (C=0.0047, l1_ratio=0.59)
 
-3. **Data Drift Detected:** Third version data shows 54% lower default rate (1.91% → 0.87%), causing Gini degradation
+3. **Data Drift Detected:** Third version data shows 54% lower default rate (1.91% → 0.87%)
 
-4. **Model Resilience:** Despite drift, optimized model maintains +54% advantage over baseline on new data
+4. **Model Resilience:** On OOT data, optimized model achieves Gini of 0.3256, maintaining +35% advantage over baseline
+
+5. **Column Mapping Applied:** 3 renamed columns in v3 successfully mapped to original names
 
 ---
 
@@ -124,17 +126,28 @@ flowchart LR
 | Total Samples | 96,757 |
 | Training Samples | 81,833 |
 | Test Samples | 14,924 |
-| Available Features | 234 (4 missing) |
+| Available Features | 237 (1 missing after mapping) |
 | Target Rate | 0.87% |
 
-### 3.3 Target Distribution Comparison
+### 3.3 Column Mapping (v3 → v2 names)
+
+The third version data has renamed columns that were mapped back to original names:
+
+| v3 Column Name | v2 Column Name | Status |
+|----------------|----------------|--------|
+| IbsWorkPositionType | WORKGROUP | Mapped |
+| IbsWorkSegment | SAHƏLƏR | Mapped |
+| LopWorkGroup | PARTNYORLUQ | Mapped |
+| - | BGN | Missing (no equivalent) |
+
+### 3.4 Target Distribution Comparison
 
 | Dataset | Good (0) | Bad (1) | Default Rate |
 |---------|----------|---------|--------------|
 | Training (v2) | 94,849 | 1,840 | 1.91% |
 | OOT (v3) | 95,914 | 843 | 0.87% |
 
-**Critical Finding:** Default rate dropped by 54% between datasets, indicating significant population drift.
+**Critical Finding:** Default rate dropped by 54% between datasets, indicating population drift.
 
 ---
 
@@ -172,8 +185,6 @@ IV = Σ (% Good - % Bad) × WOE
 | 8 | AGE | 0.3897 | Strong |
 | 9 | PARTNYORLUQ | 0.3747 | Strong |
 | 10 | FILE_AGE | 0.3365 | Strong |
-
-**Insight:** Age-related features dominate, indicating customer maturity and credit history length are strong default predictors.
 
 ### 4.4 Feature Selection Pipeline
 
@@ -265,8 +276,6 @@ LogisticRegression(
 | l2 | 8 | 0.5525 |
 | l1 | 10 | 0.4730 |
 
-**Key Insight:** Elastic Net with strong regularization (low C) and balanced L1/L2 mix provides optimal performance.
-
 ---
 
 ## 7. Model Evaluation
@@ -312,22 +321,24 @@ LogisticRegression(
 
 The trained models were evaluated on a completely new dataset to assess real-world performance and model stability.
 
-#### Dataset Comparison
+#### Column Mapping Applied
 
-| Metric | Training Data | OOT Data | Change |
-|--------|---------------|----------|--------|
-| Total Samples | 96,689 | 96,757 | +0.07% |
-| Default Rate | 1.91% | 0.87% | **-54.5%** |
-| Available Features | 238 | 234 | -4 |
+```python
+COLUMN_MAPPING = {
+    'IbsWorkPositionType': 'WORKGROUP',
+    'IbsWorkSegment': 'SAHƏLƏR',
+    'LopWorkGroup': 'PARTNYORLUQ'
+}
+```
 
-#### Missing Features in OOT Data
+#### Feature Availability After Mapping
 
-| Feature | IV | Impact |
+| Feature | IV | Status |
 |---------|-----|--------|
-| SAHƏLƏR_woe | 0.4264 | Strong predictor lost |
-| PARTNYORLUQ_woe | 0.3747 | Strong predictor lost |
-| BGN_woe | Medium | Medium impact |
-| WORKGROUP_woe | 0.2572 | Medium impact |
+| SAHƏLƏR | 0.4264 | Available (mapped from IbsWorkSegment) |
+| PARTNYORLUQ | 0.3747 | Available (mapped from LopWorkGroup) |
+| WORKGROUP | 0.2572 | Available (mapped from IbsWorkPositionType) |
+| BGN | Medium | **MISSING** (no equivalent in v3) |
 
 ### 8.2 OOT Performance Results
 
@@ -335,40 +346,34 @@ The trained models were evaluated on a completely new dataset to assess real-wor
 
 | Dataset | Model | AUC | Gini | Brier Score |
 |---------|-------|-----|------|-------------|
-| Train (81,833) | Baseline | 0.6150 | 0.2301 | 0.0993 |
-| Train (81,833) | Optimized | 0.6438 | 0.2875 | 0.0085 |
-| Test (14,924) | Baseline | 0.5331 | 0.0663 | 0.1054 |
-| Test (14,924) | Optimized | 0.5796 | 0.1593 | 0.0094 |
-| Combined (96,757) | Baseline | 0.5865 | 0.1731 | 0.0955 |
-| Combined (96,757) | Optimized | 0.6335 | 0.2670 | 0.0086 |
+| Train (81,833) | Baseline | 0.6465 | 0.2930 | 0.0744 |
+| Train (81,833) | Optimized | 0.6725 | 0.3450 | 0.0085 |
+| Test (14,924) | Baseline | 0.5708 | 0.1416 | 0.0800 |
+| Test (14,924) | Optimized | 0.6209 | 0.2418 | 0.0093 |
+| Combined (96,757) | Baseline | 0.6204 | 0.2409 | 0.0715 |
+| Combined (96,757) | Optimized | 0.6628 | 0.3256 | 0.0086 |
 
-#### Performance Comparison
+#### Performance Comparison (Combined Dataset)
 
 | Metric | Baseline | Optimized | Difference | Status |
 |--------|----------|-----------|------------|--------|
-| Combined AUC | 0.5865 | 0.6335 | +0.0470 | Better |
-| Combined Gini | 0.1731 | 0.2670 | +0.0939 | Better |
-| Combined Brier | 0.0955 | 0.0086 | -0.0869 | Better |
-| Combined Log Loss | 0.3451 | 0.0497 | -0.2954 | Better |
+| AUC | 0.6204 | 0.6628 | +0.0424 | Better |
+| Gini | 0.2409 | 0.3256 | +0.0847 | Better |
+| Brier Score | 0.0715 | 0.0086 | -0.0629 | Better |
+| Log Loss | 0.2784 | 0.0486 | -0.2298 | Better |
 
 ### 8.3 Performance Degradation Analysis
 
 | Comparison | Original Gini | OOT Gini | Drop |
 |------------|---------------|----------|------|
-| Baseline | 0.4204 | 0.1731 | -58.8% |
-| Optimized | 0.4117 | 0.2670 | -35.1% |
+| Baseline | 0.4204 | 0.2409 | -42.7% |
+| Optimized | 0.4117 | 0.3256 | -20.9% |
 
-**Key Finding:** The optimized model degrades less (-35%) compared to baseline (-59%), demonstrating better generalization.
+**Key Finding:** The optimized model degrades less (-20.9%) compared to baseline (-42.7%), demonstrating better generalization.
 
 ### 8.4 OOT Visualizations
 
 ![Third Version Evaluation](outputs/third_version_evaluation.png)
-
-**Chart Descriptions:**
-1. **ROC Curves:** Optimized model (AUC=0.6335) outperforms baseline (AUC=0.5865)
-2. **Score Distributions:** Both show class overlap, but optimized has better separation
-3. **Calibration Curves:** Optimized model shows superior calibration
-4. **Gini Comparison:** Optimized consistently better across all datasets
 
 ---
 
@@ -381,7 +386,8 @@ The trained models were evaluated on a completely new dataset to assess real-wor
 | Optimization Successful | CV Gini +4.66%, Brier -87.75% |
 | Best Configuration | Elastic Net, C=0.0047, l1_ratio=0.59 |
 | Data Drift Confirmed | Default rate: 1.91% → 0.87% |
-| Model Resilient | +54% Gini advantage maintained on OOT data |
+| Column Mapping Effective | 3 of 4 features recovered via mapping |
+| Model Resilient | OOT Gini 0.3256 (only 1 feature missing) |
 | Calibration Excellent | Brier Score 0.0086 on OOT data |
 
 ### 9.2 Model Recommendation
@@ -390,29 +396,19 @@ The trained models were evaluated on a completely new dataset to assess real-wor
 
 | Criterion | Assessment |
 |-----------|------------|
-| Discrimination | Better Gini on all datasets |
-| Calibration | 91% better Brier Score |
-| Stability | Maintains advantage under data drift |
-| Interpretability | Logistic regression coefficients |
+| Discrimination | Gini 0.3256 on OOT data |
+| Calibration | 88% better Brier Score |
+| Stability | Only 20.9% degradation vs 42.7% for baseline |
+| Missing Features | Only 1 feature (BGN) unavailable |
 
 ### 9.3 Action Items
 
 | Priority | Action | Rationale |
 |----------|--------|-----------|
 | **High** | Deploy optimized model | Best available performance |
-| **High** | Monitor monthly | Detect further degradation |
-| **Medium** | Investigate missing features | May restore predictive power |
-| **Medium** | Retrain on 2022-2024 data | Adapt to new population |
-
-### 9.4 Retraining Recommendation
-
-Given the significant data drift detected, **model retraining on third version data is recommended**:
-
-| Metric | Current OOT | Expected After Retrain |
-|--------|-------------|------------------------|
-| Gini | 0.2670 | 0.40-0.50 |
-| Calibration | Excellent | Optimal |
-| Feature Usage | 234/238 | All available |
+| **High** | Apply column mapping in production | Ensure feature availability |
+| **Medium** | Monitor monthly | Detect further degradation |
+| **Medium** | Investigate BGN feature | May improve if data available |
 
 ---
 
@@ -430,10 +426,22 @@ Given the significant data drift detected, **model retraining on third version d
 | `model_comparison.csv` | Training performance metrics |
 | `third_version_evaluation_results.csv` | OOT performance metrics |
 | `optimization_history.csv` | All 100 Optuna trials |
-| `iv_summary.csv` | IV for all features |
-| `feature_importance.csv` | Model coefficients |
 
-### 10.2 Model Loading Example
+### 10.2 Column Mapping for Production
+
+```python
+# Apply this mapping when using v3 data structure
+COLUMN_MAPPING = {
+    'IbsWorkPositionType': 'WORKGROUP',
+    'IbsWorkSegment': 'SAHƏLƏR',
+    'LopWorkGroup': 'PARTNYORLUQ'
+}
+
+# Apply mapping
+df = df.rename(columns=COLUMN_MAPPING)
+```
+
+### 10.3 Model Loading Example
 
 ```python
 import pickle
@@ -447,8 +455,14 @@ preprocessor = artifacts['preprocessor']
 woe_binner = artifacts['woe_binner']
 feature_selector = artifacts['feature_selector']
 
-# Predict on new data
+# Predict on new data (apply column mapping first!)
 def predict(new_data):
+    # Apply column mapping for v3 data
+    new_data = new_data.rename(columns={
+        'IbsWorkPositionType': 'WORKGROUP',
+        'IbsWorkSegment': 'SAHƏLƏR',
+        'LopWorkGroup': 'PARTNYORLUQ'
+    })
     cleaned = preprocessor.transform(new_data)
     woe_features = woe_binner.transform(cleaned)
     selected = feature_selector.transform(woe_features)
@@ -456,7 +470,7 @@ def predict(new_data):
     return model.predict_proba(final)[:, 1]
 ```
 
-### 10.3 Metric Definitions
+### 10.4 Metric Definitions
 
 | Metric | Formula | Interpretation |
 |--------|---------|----------------|
@@ -466,7 +480,7 @@ def predict(new_data):
 | **Log Loss** | -Mean(y×log(p) + (1-y)×log(1-p)) | Lower = better |
 | **IV** | Σ(%Good - %Bad) × WOE | >0.3 = strong predictor |
 
-### 10.4 Requirements
+### 10.5 Requirements
 
 ```
 pandas>=2.2.0
@@ -481,4 +495,5 @@ jupyter>=1.0.0
 ---
 
 *Report generated from credit_scoring_model.ipynb and model_prediction.ipynb*
-*All metrics verified against actual output files*
+*All metrics verified against actual output CSV files*
+*Column mapping applied: IbsWorkPositionType→WORKGROUP, IbsWorkSegment→SAHƏLƏR, LopWorkGroup→PARTNYORLUQ*
